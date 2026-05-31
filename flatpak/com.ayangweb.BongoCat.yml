@@ -1,0 +1,67 @@
+app-id: com.ayangweb.BongoCat
+runtime: org.gnome.Platform
+runtime-version: '50'
+sdk: org.gnome.Sdk
+command: start-bongocat
+
+finish-args:
+  # ═══ 核心：强制 XWayland ═══
+  # 只开 X11 socket，不开 Wayland。
+  # Wayland 主机上：应用通过 XWayland 渲染，alwaysOnTop / transparent / skipTaskbar 全正常工作。
+  # X11 主机上：原生运行，零开销。
+  - --socket=x11
+  # ═══ 权限 ═══
+  - --share=network # 更新检查
+  - --socket=pulseaudio # 音效
+  - --socket=session-bus # 托盘图标 + 通知 + 全局快捷键
+  - --device=dri # GPU 加速（PixiJS + WebView 渲染）
+  - --talk-name=org.freedesktop.Notifications # 桌面通知
+  - --system-talk-name=org.freedesktop.portal.Desktop # 全局快捷键
+  # 应用数据目录
+  - --filesystem=~/.config/com.ayangweb.BongoCat:create
+  - --filesystem=~/.local/share/com.ayangweb.BongoCat:create
+  - --filesystem=~/.cache/com.ayangweb.BongoCat:create
+  - --filesystem=~/.config/autostart:create # 自启动
+
+modules:
+  - name: tray-libs
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 libappindicator3.so.1 /app/lib/libappindicator3.so.1
+      - ln -s libappindicator3.so.1 /app/lib/libappindicator3.so
+      - install -Dm755 libdbusmenu-gtk3.so.4 /app/lib/libdbusmenu-gtk3.so.4
+      - install -Dm755 libdbusmenu-glib.so.4 /app/lib/libdbusmenu-glib.so.4
+    sources:
+      - type: file
+        path: /usr/lib64/libappindicator3.so.1
+      - type: file
+        path: /usr/lib64/libdbusmenu-gtk3.so.4
+      - type: file
+        path: /usr/lib64/libdbusmenu-glib.so.4
+
+  - name: bongocat
+    buildsystem: simple
+    build-commands:
+      # 二进制 — 放到 /app/bin/, Tauri custom-protocol 用 FHS 布局找资源
+      - install -Dm755 bongo-cat /app/bin/bongo-cat
+      # 资源文件 — custom-protocol 期望 /app/lib/BongoCat/assets/
+      - mkdir -p /app/lib/BongoCat/assets
+      - cp -r assets/* /app/lib/BongoCat/assets/
+      # 启动器
+      - install -Dm755 start-bongocat.sh /app/bin/start-bongocat
+      # 桌面入口
+      - install -Dm644 com.ayangweb.BongoCat.desktop /app/share/applications/com.ayangweb.BongoCat.desktop
+      # 图标
+      - install -Dm644 icon.png /app/share/icons/hicolor/256x256/apps/com.ayangweb.BongoCat.png
+    sources:
+      - type: file
+        path: ../target/release/bongo-cat
+      - type: dir
+        path: ../src-tauri/assets
+        dest: assets
+      - type: file
+        path: start-bongocat.sh
+      - type: file
+        path: com.ayangweb.BongoCat.desktop
+      - type: file
+        path: ../src-tauri/icons/icon.png

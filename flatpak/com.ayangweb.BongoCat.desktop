@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=BongoCat
+Comment=Desktop pet cat
+Exec=start-bongocat
+Icon=com.ayangweb.BongoCat
+Categories=Game;
+Terminal=false
+StartupNotify=false
+X-Flatpak=com.ayangweb.BongoCat
