@@ -57,6 +57,60 @@
 - 完全开源，代码公开透明，绝不收集任何用户数据。
 - 支持离线运行，无需联网，保护用户隐私。
 
+## Linux Flatpak 构建
+
+BongoCat 在 Wayland 上存在已知兼容性问题（`alwaysOnTop`、透明窗口不工作）。Flatpak 通过 XWayland 强制 X11 渲染解决此问题。
+
+### 前置依赖
+
+```bash
+# Fedora
+sudo dnf install flatpak flatpak-builder
+flatpak install -y flathub org.gnome.Platform//50 org.gnome.Sdk//50
+
+# 确认已安装 pnpm 和 Rust
+pnpm --version
+cargo --version
+```
+
+### 构建步骤
+
+```bash
+# 1. 安装前端依赖
+pnpm install
+
+# 2. 构建前端
+pnpm build
+
+# 3. 编译 Rust 后端（Release + custom-protocol）
+cargo build --release
+
+# 4. 构建并安装 Flatpak
+cd flatpak
+flatpak-builder --user --install --force-clean _build com.ayangweb.BongoCat.yml
+```
+
+### 运行
+
+```bash
+flatpak run com.ayangweb.BongoCat
+```
+
+### 卸载
+
+```bash
+flatpak uninstall com.ayangweb.BongoCat
+```
+
+### 技术说明
+
+| 要点         | 说明                                                                                                        |
+| ------------ | ----------------------------------------------------------------------------------------------------------- |
+| Wayland 兼容 | `--socket=x11` 只暴露 X11 socket，`GDK_BACKEND=x11` 防止 `XDG_SESSION_TYPE` 泄漏导致 WebKitGTK 误走 Wayland |
+| 前端嵌入     | 必须启用 `custom-protocol` feature，否则 release build 会尝试连接 dev server (`localhost:1420`)             |
+| 托盘图标     | GNOME 运行时不含 `libappindicator3`，manifest 从宿主机打包                                                  |
+| GPU 加速     | `--device=dri` 提供 GPU 访问，PixiJS/Live2D 正常渲染                                                        |
+
 ## 模型转换
 
 如果你想将 Bongo-Cat-Mver 应用中的模型转换为兼容 BongoCat 的格式，可以使用以下工具：
