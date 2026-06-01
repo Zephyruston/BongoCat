@@ -14,6 +14,8 @@ finish-args:
   - --share=network # 更新检查
   - --socket=pulseaudio # 音效
   - --socket=session-bus # 托盘图标 + 通知 + 全局快捷键
+  # tray-icon 会把 PNG 写到 $XDG_RUNTIME_DIR/tray-icon，宿主桌面需要读取它。
+  - --filesystem=xdg-run/tray-icon:create
   - --device=dri # GPU 加速（PixiJS + WebView 渲染）
   # 暴露 /dev/input；读取权限由宿主机 udev 的 uaccess ACL 提供。
   - --device=input # evdev 全局键盘/鼠标事件捕获
