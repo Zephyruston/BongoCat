@@ -7,7 +7,6 @@ use core::{
     prevent_default, setup,
 };
 use tauri::{Manager, WindowEvent, generate_handler};
-use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_custom_window::{
     MAIN_WINDOW_LABEL, PREFERENCE_WINDOW_LABEL, show_preference_window,
 };
@@ -52,10 +51,15 @@ pub fn run() {
                 .filter(|metadata| !metadata.target().contains("gilrs"))
                 .build(),
         )
-        .plugin(tauri_plugin_autostart::init(
-            MacosLauncher::LaunchAgent,
-            None,
-        ))
+        .plugin(
+            tauri::plugin::Builder::<tauri::Wry>::new("autostart")
+                .invoke_handler(tauri::generate_handler![
+                    core::autostart::enable,
+                    core::autostart::disable,
+                    core::autostart::is_enabled,
+                ])
+                .build(),
+        )
         .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
