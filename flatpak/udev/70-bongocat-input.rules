@@ -1,0 +1,3 @@
+# Allow the active local desktop session to read evdev events.
+# Flatpak still needs --device=input to expose these nodes inside the sandbox.
+SUBSYSTEM=="input", KERNEL=="event*", TAG+="uaccess"

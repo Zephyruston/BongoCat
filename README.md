@@ -26,7 +26,7 @@
   </p>
 </div>
 
-| macOS                                                                                        | Windows                                                                                        | Linux(x11)                                                                                   |
+| macOS                                                                                        | Windows                                                                                        | Linux (X11 + Wayland)                                                                        |
 | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | ![macOS](https://i0.hdslb.com/bfs/openplatform/dff276b96d49c5d6c431b74b531aab72191b3d87.png) | ![Windows](https://i0.hdslb.com/bfs/openplatform/a4149b753856ee7f401989da902cf3b5ad35b39e.png) | ![Linux](https://i0.hdslb.com/bfs/openplatform/3b49f961819d3ff63b2b80251c1cc13c27e986b0.png) |
 
@@ -40,7 +40,7 @@
 
 本项目的灵感来源于 [MMmmmoko](https://github.com/MMmmmoko) 大佬开发的 [Bongo-Cat-Mver](https://github.com/MMmmmoko/Bongo-Cat-Mver)。它以独特的猫咪互动功能深受用户喜爱，但仅支持 Windows 平台。作为一名深度 macOS 用户，我特别希望在自己的设备上也能使用这款可爱的猫咪，于是我决定开发一个适配 macOS 的版本。
 
-同时，得益于 [Tauri](https://github.com/tauri-apps/tauri) 强大的跨平台能力，本项目不仅支持 macOS，还兼容 Windows 和 Linux(x11)，让更多的用户都能与这只可爱的猫咪互动！
+同时，得益于 [Tauri](https://github.com/tauri-apps/tauri) 强大的跨平台能力，本项目不仅支持 macOS，还兼容 Windows 和 Linux（X11 与 Wayland），让更多的用户都能与这只可爱的猫咪互动！
 
 ## 下载
 
@@ -51,17 +51,35 @@
 
 ## 功能介绍
 
-- 适配 macOS、Windows 和 Linux(x11)。
+- 适配 macOS、Windows 和 Linux（X11 + Wayland）。
 - 根据键盘、鼠标或手柄的操作，同步对应的动作。
 - 支持导入自定义模型，自由打造专属猫咪形象。
 - 完全开源，代码公开透明，绝不收集任何用户数据。
 - 支持离线运行，无需联网，保护用户隐私。
 
-## Linux Flatpak 构建
+## Linux 构建
 
-BongoCat 在 Wayland 上存在已知兼容性问题（`alwaysOnTop`、透明窗口不工作）。Flatpak 通过 XWayland 强制 X11 渲染解决此问题。
+### 原生构建
 
-### 前置依赖
+无需 Flatpak 即可直接编译运行，通过 evdev 内核接口捕获全局键盘/鼠标事件，X11 和 Wayland 均支持。需要用户在 `input` 组中：
+
+```bash
+sudo usermod -aG input $USER
+# 重新登录生效
+
+# 构建
+pnpm install && pnpm build
+cargo build --release
+
+# 运行
+./target/release/bongo-cat
+```
+
+### Flatpak 构建
+
+Wayland 上 `alwaysOnTop`、透明窗口等窗口管理功能存在已知兼容性问题。Flatpak 通过 XWayland 强制 X11 渲染解决此问题。
+
+#### 前置依赖
 
 ```bash
 # Fedora
@@ -73,7 +91,27 @@ pnpm --version
 cargo --version
 ```
 
-### 构建步骤
+#### evdev 输入权限
+
+Flatpak 的 `--device=input` 只把 `/dev/input` 暴露到沙箱，不会绕过宿主机的设备权限。安装仓库中的 udev 规则，让 `systemd-logind` 通过 `uaccess` ACL 只向当前活动的本地桌面会话开放 `/dev/input/event*`：
+
+```bash
+sudo install -Dm644 flatpak/udev/70-bongocat-input.rules \
+  /etc/udev/rules.d/70-bongocat-input.rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger --subsystem-match=input
+sudo udevadm settle
+```
+
+规则安装后可检查宿主机 ACL。输出中应包含当前登录用户的 `user:<用户名>:rw-`：
+
+```bash
+getfacl /dev/input/event*
+```
+
+不要把设备改成 `MODE="0664"` 或 `MODE="0666"`。键盘 evdev 节点会暴露所有按键，世界可读权限会让其他本地用户也能读取输入。
+
+#### 构建步骤
 
 ```bash
 # 1. 安装前端依赖
@@ -90,19 +128,35 @@ cd flatpak
 flatpak-builder --user --install --force-clean _build com.ayangweb.BongoCat.yml
 ```
 
-### 运行
+#### 运行
 
 ```bash
 flatpak run com.ayangweb.BongoCat
 ```
 
-### 卸载
+#### 验证 evdev
+
+重新构建并安装 Flatpak 后，在仓库根目录运行：
+
+```bash
+./flatpak/verify-evdev-access.sh
+```
+
+脚本会先确认 manifest 已授予 `devices=input`，再从 Flatpak 沙箱内实际打开每个 `/dev/input/event*`。每个设备都应显示为 `readable`。
+
+最后运行应用并按键、移动鼠标，确认 Live2D 动作响应，同时终端中没有 `rdev(evdev): Failed to open /dev/input devices: Permission denied`：
+
+```bash
+flatpak run com.ayangweb.BongoCat 2>&1 | tee /tmp/bongocat-flatpak.log
+```
+
+#### 卸载
 
 ```bash
 flatpak uninstall com.ayangweb.BongoCat
 ```
 
-### 技术说明
+#### 技术说明
 
 | 要点         | 说明                                                                                                        |
 | ------------ | ----------------------------------------------------------------------------------------------------------- |
@@ -110,6 +164,7 @@ flatpak uninstall com.ayangweb.BongoCat
 | 前端嵌入     | 必须启用 `custom-protocol` feature，否则 release build 会尝试连接 dev server (`localhost:1420`)             |
 | 托盘图标     | GNOME 运行时不含 `libappindicator3`，manifest 从宿主机打包                                                  |
 | GPU 加速     | `--device=dri` 提供 GPU 访问，PixiJS/Live2D 正常渲染                                                        |
+| evdev 输入   | `--device=input` 暴露设备节点，宿主机 udev `uaccess` ACL 提供读取权限                                       |
 
 ## 模型转换
 
